@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>35 Listening Tests - Glassmorphism + Auto Score</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+            background: radial-gradient(circle at 10% 30%, rgba(180, 210, 240, 0.6), rgba(220, 240, 255, 0.9));
+        }
+        body.dark {
+            background: radial-gradient(circle at 10% 30%, #0a0f1a, #101624);
+        }
+
+        .app-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(2px);
+        }
+
+        .sticky-header {
+            background: rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        }
+        body.dark .sticky-header {
+            background: rgba(20, 30, 45, 0.5);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .test-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            padding: 12px 24px;
+            position: relative;
+        }
+
+        .test-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(0,0,0,0.1);
+            padding: 6px 20px;
+            border-radius: 60px;
+            backdrop-filter: blur(4px);
+        }
+        .test-selector label {
+            font-weight: 600;
+            color: #1e2a3e;
+        }
+        body.dark .test-selector label {
+            color: #facc15;
+        }
+        #testNumber {
+            background: rgba(255,255,240,0.9);
+            border: none;
+            padding: 6px 14px;
+            font-weight: bold;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .action-buttons {
+            position: absolute;
+            right: 24px;
+            display: flex;
+            gap: 8px;
+        }
+        button {
+            border: none;
+            padding: 6px 14px;
+            font-weight: 600;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: 0.2s;
+            background: rgba(255,255,245,0.7);
+            backdrop-filter: blur(4px);
+            color: #1f2a3a;
+        }
+        button.primary { background: #ffb347; color: #1e2a3e; }
+        button.warning { background: #d97706; color: white; }
+        button.secondary { background: #3b5e7a; color: white; }
+        button.primary:hover, button.warning:hover, button.secondary:hover { transform: scale(0.96); filter: brightness(1.05);}
+
+        .score-badge {
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            padding: 4px 16px;
+            border-radius: 60px;
+            font-weight: bold;
+            font-size: 1rem;
+            color: #ffdd99;
+        }
+        body.dark .score-badge { background: rgba(0,0,0,0.7); color: #facc15; }
+
+        .question-nav {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            padding: 10px 20px;
+            flex-wrap: wrap;
+        }
+        .nav-btn {
+            background: rgba(230, 240, 255, 0.6);
+            backdrop-filter: blur(4px);
+            border-radius: 60px;
+            padding: 6px 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.1s;
+            border: 1px solid rgba(255,255,200,0.5);
+        }
+        .nav-btn.active {
+            background: #ffb347;
+            color: #1e2a3e;
+            border-color: #ffb347;
+            box-shadow: 0 0 0 2px rgba(255,180,70,0.6);
+            transform: scale(1.02);
+        }
+        .nav-btn:hover {
+            background: #ffb347;
+            color: #1e2a3e;
+            transform: scale(1.02);
+        }
+
+        /* Slider ngang - cuộn tức thì */
+        .slider-container {
+            flex: 1;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scroll-snap-type: x mandatory;
+            scroll-behavior: auto;  /* không có hiệu ứng mượt */
+            background: rgba(255,255,245,0.2);
+        }
+        .questions-slider {
+            display: flex;
+            height: 100%;
+            align-items: stretch;
+        }
+
+        .question-card {
+            flex: 0 0 100%;
+            scroll-snap-align: start;
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(16px);
+            border-radius: 32px;
+            margin: 16px 24px;
+            border: 1px solid rgba(255,255,200,0.4);
+            box-shadow: 0 20px 35px -12px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            height: calc(100% - 32px);
+        }
+        body.dark .question-card {
+            background: rgba(30, 40, 55, 0.5);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255,215,0,0.2);
+        }
+
+        .question-header {
+            padding: 20px 20px 12px;
+            text-align: center;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+        .q-text {
+            font-weight: 800;
+            font-size: 1.25rem;
+            background: rgba(255,255,235,0.7);
+            padding: 10px 24px;
+            border-radius: 60px;
+            display: inline-block;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: 0.1s;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        .q-text:hover {
+            background: #ffb347;
+            color: #1e2a3e;
+        }
+
+        .images-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            padding: 20px;
+        }
+        .img-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: transparent;
+        }
+        .img-frame {
+            width: 100%;
+            height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(240,245,250,0.3);
+            border-radius: 24px;
+            border: 1px solid rgba(0,0,0,0.1);
+            padding: 10px;
+            margin-bottom: 12px;
+        }
+        .img-frame img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 16px;
+        }
+        .answer-choice-btn {
+            background: rgba(255,250,210,0.8);
+            border: 1px solid #ccc;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+        .answer-choice-btn.selected {
+            background: #ffb347;
+            border-color: #ffb347;
+            color: #1e2a3e;
+        }
+        .answer-area {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px 20px;
+            border-top: 1px solid rgba(0,0,0,0.08);
+            margin-top: 8px;
+        }
+        .feedback-area {
+            font-size: 0.85rem;
+            padding: 4px 14px;
+            border-radius: 60px;
+            font-weight: 600;
+        }
+        .feedback-correct { background: #d1fae5; color: #065f46; }
+        .feedback-wrong { background: #fee2e2; color: #991b1b; }
+        .feedback-neutral { background: #e2e8f0; color: #334155; }
+
+        .shuffle-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 6px;
+        }
+        button.small {
+            background: rgba(0,0,0,0.2);
+            padding: 4px 12px;
+            font-size: 0.7rem;
+        }
+
+        .footer {
+            background: rgba(255,255,245,0.4);
+            backdrop-filter: blur(8px);
+            padding: 8px;
+            text-align: center;
+            font-size: 0.7rem;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        .edit-note {
+            font-size: 0.65rem;
+            color: #2c3e4e;
+        }
+        @media (max-width: 700px) {
+            .images-row { grid-template-columns: 1fr; gap: 16px; }
+            .q-text { font-size: 1rem; }
+            .test-header { flex-direction: column; align-items: center; }
+            .action-buttons { position: static; margin-top: 8px; }
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <div class="sticky-header">
+        <div class="test-header">
+            <div class="test-selector">
+                <label>🎧 TEST</label>
+                <select id="testNumber"></select>
+                <span id="scoreDisplay" class="score-badge">0/7</span>
+            </div>
+            <div class="action-buttons">
+                <button id="shuffleAllBtn" class="warning">🎲 Xáo trộn</button>
+                <button id="resetAllBtn" class="secondary">⟳ Khôi phục</button>
+                <button id="checkAllBtn" class="primary">📊 Kiểm tra tất cả</button>
+                <button id="darkModeToggle" class="darkmode-toggle">🌙 Dark</button>
+            </div>
+        </div>
+        <div id="questionNav" class="question-nav"></div>
+    </div>
+
+    <div id="sliderContainer" class="slider-container">
+        <div id="questionsSlider" class="questions-slider"></div>
+    </div>
+
+    <div class="footer">
+        <button id="resetAnswersBtn" class="secondary small">🗑 Xóa lựa chọn</button>
+        <span>💡 Đáp án = ảnh A (gốc). Chọn đáp án tự động chấm điểm.</span>
+        <span class="edit-note">📝 Nhấp đúp câu hỏi để sửa.</span>
+    </div>
+</div>
+
+<script>
+    // ---------- DỮ LIỆU 35 TEST ----------
+    const questionsData = [
+        ["Where will the girls meet?", "Which chair does the man want?", "Which picture shows what the girls need?", "Which picture shows what happened?", "What is Sarah's mother doing?", "What luggage is the man taking on holiday?", "Which photograph does the man like?"],
+        ["When and where are they meeting?", "What will Chris get for his birthday?", "What does Mr Jones look like?", "Where is he going to plant the tree?", "What is the man going to buy?", "Which is Gary's room?", "Which is the best vehicle for the man?"],
+        ["Where is the station?", "Where did the woman put the calculator?", "Where is Helen?", "Which building was hit by lightning?", "What does the woman want to buy?", "Which picture does the woman decide to send?", "Which hotel has the man chosen?"],
+        ["Where are the woman's glasses?", "What damage was done to the car?", "What did she bring?", "What did Sally buy?", "Where are the man and his grandma?", "What would John like to be?", "Which pianist are the two people talking about?"],
+        ["What was in the woman's bag?", "Which film is the man talking about?", "What should the woman do first?", "What is David going to do this weekend?", "How did the man get to work today?", "Which tie does the man choose?", "What time is the appointment?"],
+        ["How did the film end?", "What time does the train to Rome leave?", "What is broken?", "Where are the man's shoes?", "What will Paul get at the shop?", "How were they told to do their homework?", "What did Helen buy?"],
+        ["How did the woman get to work today?", "Where does the pollution come from?", "When must the boys get on the coach?", "What fruit do they take?", "Which present has the man bought?", "Where are the photographs?", "What did Ben break?"],
+        ["What time will the flight leave?", "Which is the photo of the girl's father?", "What must the woman wear at work?", "Where will they sit in the theatre?", "How did the woman cook the onions?", "What will the man buy?", "How will they travel to Edinburgh?"],
+        ["Which activity will the family do this year?", "Which is the woman's house?", "Why will drivers have problems this morning?", "What time will Robin leave the house?", "What did Simon do this morning?", "What hasn't the girl packed yet?", "What has the woman just bought?"],
+        ["How much is the man's ticket?", "What will they have for lunch?", "Why was the man late home?", "What was the weather like on John's holiday?", "What time was the woman's appointment?", "What did the woman buy?", "Where are the man and woman talking?"],
+        ["What is the man going to buy?", "Which dress is Kate talking about?", "When will Jane meet them?", "Which morning activity is for beginners?", "Which painting does the woman decide to buy?", "What is the man selling?", "What is the weather forecast for tomorrow?"],
+        ["Where will the woman go first after work?", "What can festival visitors see every day?", "What souvenir will the boy's mother bring?", "What time is the woman's hair appointment?", "Where's the TV guide?", "What does the man decide to take Tracy?", "Which sport has the man just started?"],
+        ["What was damaged in the storm?", "What present does the man decide to take?", "Which is the woman's jacket?", "Which sport is not included in the price of the holiday?", "Which postcard will they send?", "Where do they decide to go?", "What will the boy do first?"],
+        ["Which sport will the woman learn on holiday?", "What does the girl's penfriend look like now?", "Which animals did the children see?", "Which TV programme is on first?", "What does the boy decide to buy for his grandmother?", "What time is the man's appointment?", "What has the woman lost?"],
+        ["What is the weather forecast for tomorrow?", "What will they buy at the supermarket?", "Which T-shirt does the woman buy?", "What will the girl take with her on holiday?", "Which exercise is the teacher describing?", "What time will the train to London leave?", "Which sport will the boy do soon at the centre?"],
+        ["Which of Miranda's things will Lucy be able to use?", "What can't the woman find?", "Which ring has the woman lost?", "What time did the girl arrive?", "What will be on television at 10 o'clock this evening?", "What will the party be?", "What did the man buy?"],
+        ["Where will the friends meet?", "What has the girl forgotten to bring?", "Which TV programme is on at 9 o'clock?", "How will the man book tickets for the show?", "What will the man do this winter?", "How does the man want the woman to help him?", "Which house did the woman stay in?"],
+        ["Where are the dictionaries?", "Which evening dress does the woman decide to wear?", "What is the man's job now?", "Which calendar will the boy buy?", "What time will the writer arrive at the bookshop?", "What did the woman leave in the restaurant?", "Where is the bicycle?"],
+        ["What regular exercise does David do at the moment?", "What should Suzie take to Emma's house?", "Which type of T-shirt did the boy choose?", "What frightened the man?", "Where is the man calling from?", "How did the woman spend on her last holiday?", "Where is the girl's purse?"],
+        ["What did the thieves steal?", "What present will they take?", "What will the woman eat tonight?", "How much will the girl's ticket cost?", "What is the grandmother's job now?", "What button has the boy lost?", "What will the man do first?"],
+        ["How will they book their flights?", "What has the daughter forgot to bring on holiday?", "What will the man and woman do on Sunday?", "Which blouse does the girl decide to buy?", "When is the girl having a party?", "Where is the motorcycle race going to finish?", "What will the woman repair next week?"],
+        ["What has the boy lost?", "What time does the race begin?", "Which musical instrument does the boy play now?", "What will the weather be like tomorrow afternoon?", "What is the subject of James Wilson's book?", "Which part of the man's body hurts him at the moment?", "Where was the man's knowledge of Spanish useful?"],
+        ["Which present will the girl receive?", "Where will the tourists go last?", "How much does the man pay for the postage?", "Where in the theatre did the woman leave her gloves?", "Which dress does the woman like best?", "What is the television programme about?", "Which vehicle does Steve intend to buy?"],
+        ["Which prize has the man just won?", "What was the man's first job?", "Where will they have something to eat?", "What does the woman's house look like?", "Which sport will they do tomorrow?", "What can you see on the television programme?", "Where will the man sit on the plane?"],
+        ["What did the man buy?", "How will the woman help the man?", "What will the students buy for their teacher?", "Which exhibition is the busiest today?", "Where can visitors see the ducks?", "What will the weather be like when the festival starts?", "What has the man sent back to the company?"],
+        ["What is the girl doing?", "What will the weather be like tomorrow?", "Which musical instrument is the girl learning to play?", "Where will they meet?", "What time does the museum shut on Saturdays?", "Where is the flat?", "What did the woman receive in the post?"],
+        ["Where are the men's gloves?", "Who is the girl's new teacher?", "How much will they pay to hire the car?", "What present has the boy bought Alison?", "What time will the next flight to Madrid leave?", "What did the girl like best about her holiday?", "What is the first programme after the news?"],
+        ["Which are Emily's cousins?", "What can Maria see from her window?", "What can't the boy find?", "What does the woman buy?", "What must the children bring?", "What time will the woman meet her son?", "Which hotel did the man stay in?"],
+        ["How will the girl travel from the airport?", "Where is the post office?", "What was the weather like at the seaside?", "Where did the boy leave his sunglasses?", "Where will the tour guide be at eight o'clock tomorrow morning?", "What time is the man's new appointment?", "Which postcard do they decide to send to Sarah?"],
+        ["Why is the woman going to be late?", "What is the girl going to buy?", "When does the music festival start?", "Which sport will they do this afternoon?", "Where is the girl's mobile phone?", "What do they order?", "Which photograph are they looking at?"],
+        ["What is the woman's first memory?", "Which train will the woman catch?", "What should the students take with them tomorrow?", "What will they do at the weekend?", "What does the woman need to buy?", "How will the boy get to school?", "Which is Tanya's boyfriend?"],
+        ["What will the weather be like tomorrow?", "What will the man do first?", "Where is the knife?", "What happened to the girl this afternoon?", "Which man is waiting at the bus stop?", "What time does the television programme end?", "Which postcard will they send to Mark?"],
+        ["Which present will the girl take?", "Who lives in Joe's house now?", "Who will be on the stage next?", "Where is the woman's notebook now?", "What time will the cake be ready?", "Which TV programme will they watch together?", "How will the family get to Glasgow?"],
+        ["Which present has the girl bought her mother?", "What will the prize be in the painting competition?", "Which photo does the girl dislike?", "What should the students take on the school trip?", "Which subject does the boy like best?", "What time is the dance class today?", "Which vegetables do they decide to put in the curry?"],
+        ["What time did the taxi arrive?", "What will they buy first?", "Which is the girl's bag?", "How will the boy contact his mother?", "What should Jessie bring to the picnic?", "What did the man buy?", "Which bus will the girl catch?"]
+    ];
+
+    const TOTAL_TESTS = 35;
+    const QUES_PER_TEST = 7;
+    const IMAGE_BASE = "images/";
+
+    let testsData = [];
+    let currentTestIdx = 0;
+    let sliderContainer, slider;
+
+    function initData() {
+        for(let t=1; t<=TOTAL_TESTS; t++) {
+            let test = [];
+            for(let q=1; q<=QUES_PER_TEST; q++) {
+                const a = `${IMAGE_BASE}t${t}q${q}a.png`;
+                const b = `${IMAGE_BASE}t${t}q${q}b.png`;
+                const c = `${IMAGE_BASE}t${t}q${q}c.png`;
+                test.push({
+                    text: questionsData[t-1][q-1],
+                    originalImages: [a,b,c],
+                    correctImagePath: a,
+                    currentOrderIndices: [0,1,2],
+                    userAnswer: null,
+                    feedback: null
+                });
+            }
+            testsData.push(test);
+        }
+    }
+
+    function getDisplayImages(q) { return q.currentOrderIndices.map(i => q.originalImages[i]); }
+    function getCorrectDisplayIndex(q) {
+        let correctOrig = q.originalImages.findIndex(img => img === q.correctImagePath);
+        return q.currentOrderIndices.findIndex(idx => idx === correctOrig);
+    }
+    function computeAndSetFeedback(question) {
+        if (!question.userAnswer) {
+            question.feedback = null;
+            return;
+        }
+        const selectedIdx = question.userAnswer === 'A' ? 0 : (question.userAnswer === 'B' ? 1 : 2);
+        const correctIdx = getCorrectDisplayIndex(question);
+        const isCorrect = (selectedIdx === correctIdx);
+        const correctLetter = correctIdx === 0 ? 'A' : (correctIdx === 1 ? 'B' : 'C');
+        question.feedback = { correct: isCorrect, correctLetter };
+    }
+    function updateScoreDisplay() {
+        const test = testsData[currentTestIdx];
+        let correctCount = 0;
+        for(let q of test) if(q.feedback && q.feedback.correct) correctCount++;
+        document.getElementById('scoreDisplay').innerText = `${correctCount}/${QUES_PER_TEST}`;
+    }
+    function autoCheckAndRender() {
+        renderCurrentTest();
+        updateScoreDisplay();
+        highlightCurrentQuestion(); // cập nhật active sau khi render
+    }
+    function setUserAnswer(testIdx, qIdx, choice) {
+        let q = testsData[testIdx][qIdx];
+        q.userAnswer = choice;
+        computeAndSetFeedback(q);
+        autoCheckAndRender();
+    }
+
+    function shuffleQuestion(q) {
+        let order = [...q.currentOrderIndices];
+        for(let i=order.length-1;i>0;i--) {
+            let j = Math.floor(Math.random()*(i+1));
+            [order[i], order[j]] = [order[j], order[i]];
+        }
+        q.currentOrderIndices = order;
+        computeAndSetFeedback(q);
+    }
+    function resetQuestionOrder(q) {
+        q.currentOrderIndices = [0,1,2];
+        computeAndSetFeedback(q);
+    }
+    function updateQuestionText(testIdx, qIdx, newText) {
+        testsData[testIdx][qIdx].text = newText;
+        autoCheckAndRender();
+    }
+
+    // Cuộn ngay tức thì (behavior: 'auto')
+    function scrollToQuestion(idx) {
+        let target = document.getElementById(`qcard-${currentTestIdx}-${idx}`);
+        if(target && sliderContainer) {
+            sliderContainer.scrollTo({ left: target.offsetLeft - sliderContainer.offsetLeft, behavior: 'auto' });
+        }
+    }
+
+    // Làm nổi bật nút câu hỏi đang hiển thị
+    function highlightCurrentQuestion() {
+        if(!sliderContainer) return;
+        const containerRect = sliderContainer.getBoundingClientRect();
+        const cards = document.querySelectorAll('.question-card');
+        let bestIndex = 0;
+        let maxVisible = 0;
+        cards.forEach((card, idx) => {
+            const rect = card.getBoundingClientRect();
+            const visibleLeft = Math.max(containerRect.left, rect.left);
+            const visibleRight = Math.min(containerRect.right, rect.right);
+            const visibleWidth = Math.max(0, visibleRight - visibleLeft);
+            if(visibleWidth > maxVisible) {
+                maxVisible = visibleWidth;
+                bestIndex = idx;
+            }
+        });
+        // Cập nhật class active trên các nút
+        const navBtns = document.querySelectorAll('.nav-btn');
+        navBtns.forEach((btn, i) => {
+            if(i === bestIndex) btn.classList.add('active');
+            else btn.classList.remove('active');
+        });
+    }
+
+    function renderNav() {
+        let navDiv = document.getElementById('questionNav');
+        navDiv.innerHTML = '';
+        for(let i=1;i<=QUES_PER_TEST;i++) {
+            let btn = document.createElement('button');
+            btn.innerText = i;
+            btn.classList.add('nav-btn');
+            btn.onclick = (() => { scrollToQuestion(i-1); });
+            navDiv.appendChild(btn);
+        }
+    }
+
+    function renderCurrentTest() {
+        if(!slider) return;
+        let test = testsData[currentTestIdx];
+        slider.innerHTML = '';
+        for(let i=0;i<test.length;i++) {
+            let q = test[i];
+            let imgs = getDisplayImages(q);
+            let letters = ['A','B','C'];
+            let imagesHtml = '';
+            for(let idx=0;idx<3;idx++) {
+                let isSel = (q.userAnswer === letters[idx]);
+                imagesHtml += `
+                    <div class="img-option">
+                        <div class="img-frame"><img src="${imgs[idx]}" onerror="this.src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2280%22%20height%3D%2280%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23ddd%22%2F%3E%3Ctext%20x%3D%2240%22%20y%3D%2245%22%3E%3F%3C%2Ftext%3E%3C%2Fsvg%3E'"></div>
+                        <div class="answer-choice-btn ${isSel ? 'selected' : ''}" data-qidx="${i}" data-choice="${letters[idx]}">Chọn ${letters[idx]}</div>
+                    </div>
+                `;
+            }
+            let fbHtml = '';
+            if(q.feedback) {
+                let cls = q.feedback.correct ? 'feedback-correct' : 'feedback-wrong';
+                fbHtml = `<div class="feedback-area ${cls}">${q.feedback.correct ? '✓ Đúng' : `✗ Sai (Đáp án ${q.feedback.correctLetter})`}</div>`;
+            } else fbHtml = `<div class="feedback-area feedback-neutral">⚡ Chưa chọn</div>`;
+            let card = document.createElement('div');
+            card.className = 'question-card';
+            card.id = `qcard-${currentTestIdx}-${i}`;
+            card.innerHTML = `
+                <div class="question-header">
+                    <div class="q-text" data-qidx="${i}" data-testidx="${currentTestIdx}">${escapeHtml(q.text)}</div>
+                    <div class="shuffle-actions">
+                        <button class="small shuffle-single" data-qidx="${i}">🎲 Xáo</button>
+                        <button class="small reset-single" data-qidx="${i}">⟳ Khôi phục</button>
+                    </div>
+                </div>
+                <div class="images-row">${imagesHtml}</div>
+                <div class="answer-area">${fbHtml}</div>
+            `;
+            slider.appendChild(card);
+        }
+        attachCardEvents();
+        renderNav();
+        updateScoreDisplay();
+        // Sau khi render, đợi một chút để layout ổn định rồi highlight
+        setTimeout(highlightCurrentQuestion, 30);
+    }
+
+    function attachCardEvents() {
+        // Gắn sự kiện chọn đáp án
+        document.querySelectorAll('.answer-choice-btn').forEach(btn => {
+            btn.removeEventListener('click', answerHandler);
+            btn.addEventListener('click', answerHandler);
+        });
+        function answerHandler(e) {
+            let qidx = parseInt(e.currentTarget.dataset.qidx);
+            let choice = e.currentTarget.dataset.choice;
+            setUserAnswer(currentTestIdx, qidx, choice);
+        }
+        // Xáo / reset
+        document.querySelectorAll('.shuffle-single').forEach(btn => {
+            btn.onclick = (e) => {
+                let qidx = parseInt(btn.dataset.qidx);
+                shuffleQuestion(testsData[currentTestIdx][qidx]);
+                autoCheckAndRender();
+            };
+        });
+        document.querySelectorAll('.reset-single').forEach(btn => {
+            btn.onclick = (e) => {
+                let qidx = parseInt(btn.dataset.qidx);
+                resetQuestionOrder(testsData[currentTestIdx][qidx]);
+                autoCheckAndRender();
+            };
+        });
+        // Double click sửa câu
+        document.querySelectorAll('.q-text').forEach(elem => {
+            elem.ondblclick = (e) => {
+                let qidx = parseInt(elem.dataset.qidx);
+                let testIdx = parseInt(elem.dataset.testidx);
+                let old = testsData[testIdx][qidx].text;
+                let input = document.createElement('input');
+                input.value = old;
+                input.style.width = '80%';
+                input.style.padding = '4px 12px';
+                input.style.borderRadius = '40px';
+                elem.innerText = '';
+                elem.appendChild(input);
+                input.focus();
+                let save = () => {
+                    let newText = input.value.trim();
+                    if(newText) updateQuestionText(testIdx, qidx, newText);
+                    else autoCheckAndRender();
+                };
+                input.onblur = save;
+                input.onkeypress = (ev) => { if(ev.key === 'Enter') save(); };
+            };
+        });
+    }
+
+    function shuffleAll() {
+        for(let q of testsData[currentTestIdx]) shuffleQuestion(q);
+        autoCheckAndRender();
+    }
+    function resetAllOrders() {
+        for(let q of testsData[currentTestIdx]) resetQuestionOrder(q);
+        autoCheckAndRender();
+    }
+    function resetAllAnswers() {
+        for(let q of testsData[currentTestIdx]) {
+            q.userAnswer = null;
+            q.feedback = null;
+        }
+        autoCheckAndRender();
+    }
+    function checkAll() {
+        let correct = 0;
+        for(let q of testsData[currentTestIdx]) if(q.feedback && q.feedback.correct) correct++;
+        alert(`Kết quả Test ${currentTestIdx+1}: ${correct}/${QUES_PER_TEST} câu đúng.`);
+    }
+
+    function escapeHtml(str) { return str.replace(/[&<>]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+
+    function populateTestDropdown() {
+        let sel = document.getElementById('testNumber');
+        sel.innerHTML = '';
+        for(let i=1;i<=TOTAL_TESTS;i++) {
+            let opt = document.createElement('option');
+            opt.value = i-1;
+            opt.text = `Test ${i}`;
+            sel.appendChild(opt);
+        }
+        sel.value = currentTestIdx;
+        sel.onchange = (e) => {
+            currentTestIdx = parseInt(e.target.value);
+            autoCheckAndRender();
+        };
+    }
+
+    function initDarkMode() {
+        const toggle = document.getElementById('darkModeToggle');
+        const isDark = localStorage.getItem('darkMode') === 'true';
+        if(isDark) document.body.classList.add('dark');
+        toggle.innerHTML = isDark ? '☀️ Light' : '🌙 Dark';
+        toggle.onclick = () => {
+            document.body.classList.toggle('dark');
+            let dark = document.body.classList.contains('dark');
+            localStorage.setItem('darkMode', dark);
+            toggle.innerHTML = dark ? '☀️ Light' : '🌙 Dark';
+        };
+    }
+
+    // Theo dõi sự kiện cuộn ngang để cập nhật active
+    function bindScrollHighlight() {
+        if(sliderContainer) {
+            sliderContainer.addEventListener('scroll', () => {
+                highlightCurrentQuestion();
+            });
+        }
+    }
+
+    window.onload = () => {
+        initData();
+        sliderContainer = document.getElementById('sliderContainer');
+        slider = document.getElementById('questionsSlider');
+        populateTestDropdown();
+        autoCheckAndRender();
+        initDarkMode();
+        bindScrollHighlight();
+
+        document.getElementById('shuffleAllBtn').onclick = shuffleAll;
+        document.getElementById('resetAllBtn').onclick = resetAllOrders;
+        document.getElementById('checkAllBtn').onclick = checkAll;
+        document.getElementById('resetAnswersBtn').onclick = resetAllAnswers;
+    };
+</script>
+</body>
+</html>
